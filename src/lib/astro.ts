@@ -127,6 +127,12 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   {
+    id: "gargantua",
+    name: "Gargantua",
+    note: "Interestelar · 10⁸ M☉ · giro extremo",
+    patch: { presetId: "gargantua", mass: 1e8, accretion: 0.42, tilt: 62, jets: false, probeR: 6 },
+  },
+  {
     id: "cygx1",
     name: "Cygnus X-1",
     note: "buraco negro estelar · 21 M☉",
