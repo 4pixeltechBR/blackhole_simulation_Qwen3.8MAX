@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
-import SimCanvas from "./components/SimCanvas";
+import { useCallback, useMemo, useRef, useState } from "react";
+import SimCanvas, { type SimCanvasHandle } from "./components/SimCanvas";
 import ControlPanel from "./components/ControlPanel";
 import { PhysicsPanel, TelemetryPanel } from "./components/SidePanels";
 import { useDrone } from "./hooks/useDrone";
-import { computeTelemetry, type SimParams } from "./lib/astro";
+import { computeTelemetry, fmtNum, type SimParams } from "./lib/astro";
 
 const INITIAL: SimParams = {
   mass: 4.3e6,
@@ -22,19 +22,22 @@ const INITIAL: SimParams = {
 export default function App() {
   const [params, setParams] = useState<SimParams>(INITIAL);
   const [sound, setSound] = useState(false);
-  const [fps, setFps] = useState(0);
+  const [hud, setHud] = useState({ fps: 0, zoom: 1 });
   const [isMobile] = useState(() => window.innerWidth < 1024);
+  const simRef = useRef<SimCanvasHandle | null>(null);
 
   const patch = useCallback((p: Partial<SimParams>) => {
     setParams((prev) => ({ ...prev, ...p }));
   }, []);
+
+  const onHud = useCallback((fps: number, zoom: number) => setHud({ fps, zoom }), []);
 
   const telemetry = useMemo(() => computeTelemetry(params), [params]);
   useDrone(sound, params.mass, params.accretion);
 
   return (
     <main className="relative h-full w-full overflow-hidden bg-void text-zinc-200">
-      <SimCanvas params={params} onFps={setFps} />
+      <SimCanvas ref={simRef} params={params} onHud={onHud} />
 
       {/* véu de legibilidade nas bordas */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgba(2,3,9,0.5)_100%)]" />
@@ -58,18 +61,55 @@ export default function App() {
           Um buraco negro supermassivo ancora o centro de uma galáxia espiral. Ajuste a massa,
           alimente o disco de acreção e observe a luz das estrelas se curvar ao redor da sombra.
         </p>
-        <div className="flex items-center gap-4 mt-3.5 font-num text-[10px] tracking-[0.14em] text-zinc-500">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 font-num text-[10px] tracking-[0.14em] text-zinc-500">
           <span className="flex items-center gap-1.5">
             <span className={`h-[6px] w-[6px] rounded-full ${params.paused ? "bg-zinc-500" : "bg-amber-400 animate-pulse-dot"}`} />
             {params.paused ? "SIMULAÇÃO PAUSADA" : "INTEGRAÇÃO EM TEMPO REAL"}
           </span>
-          <span className="hidden sm:inline text-zinc-600">mova o cursor · paralaxe</span>
+          <span className="hidden sm:inline text-zinc-600">
+            arraste p/ mover · scroll p/ zoom · 2× clique recentra
+          </span>
         </div>
       </header>
 
       {/* ---------- telemetria (direita) ---------- */}
       <div className={`fixed right-4 md:right-6 z-10 ${isMobile ? "top-[104px]" : "top-7"} animate-rise`} style={{ animationDelay: "0.12s" }}>
-        <TelemetryPanel t={telemetry} p={params} fps={fps} defaultOpen={!isMobile} />
+        <TelemetryPanel t={telemetry} p={params} fps={hud.fps} defaultOpen={!isMobile} />
+      </div>
+
+      {/* ---------- HUD da câmera ---------- */}
+      <div
+        className="fixed right-4 md:right-6 top-1/2 z-10 -translate-y-1/2 animate-rise"
+        style={{ animationDelay: "0.16s" }}
+        title="Câmera"
+      >
+        <div className="flex flex-col items-center gap-0.5 rounded-md border border-white/10 bg-black/50 p-1.5 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.45)]">
+          <button className="hud-btn" aria-label="Aproximar" title="Aproximar" onClick={() => simRef.current?.zoomBy(1.4)}>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M8 3.5v9M3.5 8h9" />
+            </svg>
+          </button>
+          <span className="my-0.5 font-num text-[10px] tabular-nums tracking-wide text-amber-300/90">
+            ×{fmtNum(hud.zoom, 1)}
+          </span>
+          <button className="hud-btn" aria-label="Afastar" title="Afastar" onClick={() => simRef.current?.zoomBy(1 / 1.4)}>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M3.5 8h9" />
+            </svg>
+          </button>
+          <div className="my-1 h-px w-5 bg-white/10" />
+          <button
+            className="hud-btn"
+            aria-label="Recentralizar vista"
+            title="Recentralizar (ou duplo clique)"
+            onClick={() => simRef.current?.reset()}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2.5 5.5v-3h3M13.5 5.5v-3h-3M2.5 10.5v3h3M13.5 10.5v3h-3" />
+              <circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ---------- controles (esquerda, abaixo) ---------- */}

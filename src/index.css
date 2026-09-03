@@ -143,3 +143,21 @@ input[type="range"]:hover::-moz-range-thumb {
 .thin-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(245, 158, 11, 0.45);
 }
+
+/* ---------- botões do HUD da câmera ---------- */
+.hud-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #a1a8b8;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+.hud-btn:hover {
+  color: #fcd34d;
+  background: rgba(255, 255, 255, 0.08);
+}
+.hud-btn:active {
+  transform: scale(0.9);
+}

@@ -93,14 +93,22 @@ export class Engine {
   private tpx = 0;
   private tpy = 0;
 
+  // câmera: zoom + arrasto
+  private zoomT = 1;
+  private zoomCur = 1;
+  private panTX = 0;
+  private panTY = 0;
+  private panCurX = 0;
+  private panCurY = 0;
+
   private fpsFrames = 0;
   private fpsTime = 0;
-  private onFps?: (fps: number) => void;
+  private onHud?: (fps: number, zoom: number) => void;
 
   private rnd = mulberry32(20260214);
 
-  constructor(onFps?: (fps: number) => void) {
-    this.onFps = onFps;
+  constructor(onHud?: (fps: number, zoom: number) => void) {
+    this.onHud = onHud;
     this.seedBackground();
     this.seedDisk();
     this.seedJets();
@@ -208,6 +216,44 @@ export class Engine {
     this.tpy = ny;
   }
 
+  /* -------------------------- câmera -------------------------- */
+
+  /** Zoom mantendo o ponto de mundo sob (mx,my) fixo na tela */
+  zoomAt(mx: number, my: number, factor: number) {
+    const z0 = this.zoomT;
+    const z1 = clamp(z0 * factor, 0.55, 8);
+    if (Math.abs(z1 - z0) < 1e-6) return;
+    const wx = (mx - this.cx - this.panTX) / z0;
+    const wy = (my - this.cy - this.panTY) / z0;
+    this.panTX = mx - this.cx - wx * z1;
+    this.panTY = my - this.cy - wy * z1;
+    this.zoomT = z1;
+    this.clampPan();
+  }
+
+  /** Deslocamento em pixels de tela (arrasto 1:1 com o cursor) */
+  panBy(dx: number, dy: number) {
+    this.panTX += dx;
+    this.panTY += dy;
+    this.clampPan();
+  }
+
+  resetView() {
+    this.zoomT = 1;
+    this.panTX = 0;
+    this.panTY = 0;
+  }
+
+  getZoom(): number {
+    return this.zoomCur;
+  }
+
+  private clampPan() {
+    const lim = Math.max(this.w, this.h) * 0.85 * this.zoomT;
+    this.panTX = clamp(this.panTX, -lim, lim);
+    this.panTY = clamp(this.panTY, -lim, lim);
+  }
+
   private rsPx(mass: number): number {
     // escala visual: ~5 px (buraco estelar) até ~2,2% do lado menor (10¹⁰ M☉)
     return clamp(
@@ -231,20 +277,30 @@ export class Engine {
     this.px += (this.tpx - this.px) * 0.045;
     this.py += (this.tpy - this.py) * 0.045;
 
+    // easing da câmera (zoom + arrasto)
+    this.zoomCur += (this.zoomT - this.zoomCur) * 0.14;
+    this.panCurX += (this.panTX - this.panCurX) * 0.22;
+    this.panCurY += (this.panTY - this.panCurY) * 0.22;
+    if (Math.abs(this.zoomCur - this.zoomT) < 5e-4) this.zoomCur = this.zoomT;
+
+    const Z = this.zoomCur;
     const massN = p.mass / 4.3e6;
-    const rs = this.rsPx(p.mass);
+    const rs = this.rsPx(p.mass) * Z;
     const tilt = (p.tilt * Math.PI) / 180;
     const cosI = Math.cos(tilt);
     const sinI = Math.sin(tilt);
-    const { cx, cy, U } = this;
+    const cx = this.cx + this.panCurX;
+    const cy = this.cy + this.panCurY;
+    const U = this.U * Z;
+    const lwK = Math.pow(Z, 0.55); // espessuras de traço acompanham o zoom
     const acc = clamp(p.accretion, 0, 1.2);
-    const kU3 = Math.pow(U / 900, 3);
+    const kU3 = Math.pow(this.U / 900, 3); // ω orbital não depende do zoom
 
     /* --- física orbital (visual) --- */
     const gmVis = massN * 2.2e4 * kU3;
     for (const s of this.gal) {
-      const r = s.rf * U;
-      const om = Math.min(1.6, Math.sqrt(gmVis / Math.max(r * r * r, 1)));
+      const r0 = s.rf * this.U; // raio sem zoom → ω constante
+      const om = Math.min(1.6, Math.sqrt(gmVis / Math.max(r0 * r0 * r0, 1)));
       s.th += om * dts;
     }
     for (const d of this.disk) {
@@ -261,10 +317,16 @@ export class Engine {
 
     ctx.globalCompositeOperation = "lighter";
 
-    // nebulosas ambientes (deriva lenta)
+    // nebulosas ambientes (deriva lenta, camada distante)
     for (const b of this.blobs) {
-      const bx = b.fx * this.w + Math.sin(this.tWall * 0.03 + b.ph) * U * 0.012 + this.px * 16;
-      const by = b.fy * this.h + Math.cos(this.tWall * 0.026 + b.ph) * U * 0.012 + this.py * 16;
+      const bx =
+        this.cx + (b.fx * this.w - this.cx) * Z +
+        Math.sin(this.tWall * 0.03 + b.ph) * U * 0.012 +
+        this.panCurX * 0.3 + this.px * 16;
+      const by =
+        this.cy + (b.fy * this.h - this.cy) * Z +
+        Math.cos(this.tWall * 0.026 + b.ph) * U * 0.012 +
+        this.panCurY * 0.3 + this.py * 16;
       const br = b.rf * U;
       const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
       g.addColorStop(0, `rgba(${b.col[0]},${b.col[1]},${b.col[2]},${b.al})`);
@@ -274,17 +336,16 @@ export class Engine {
     }
 
     /* --- lente gravitacional: estrelas de fundo --- */
-    const re = 2.4 * rs + 9; // raio de Einstein visual
+    const re = 2.4 * rs + 9 * Z; // raio de Einstein visual
     const lensOn = p.lensing;
-    const bgOx = this.px * 10;
-    const bgOy = this.py * 10;
 
     for (const s of this.bg) {
       const twk = 0.68 + 0.32 * Math.sin(this.tWall * s.tw + s.ph);
-      let x = s.x + bgOx;
-      let y = s.y + bgOy;
+      // camada "no infinito": zoom pleno, arrasto reduzido (profundidade)
+      let x = this.cx + (s.x - this.cx) * Z + this.panCurX * 0.3 + this.px * 10;
+      let y = this.cy + (s.y - this.cy) * Z + this.panCurY * 0.3 + this.py * 10;
       let alpha = s.a * twk;
-      let size = s.s;
+      let size = s.s * Math.pow(Z, 0.5);
       let streak = 0;
 
       if (lensOn) {
@@ -400,24 +461,26 @@ export class Engine {
       const alpha = s.a * twk;
 
       if (p.trails) {
-        const rOm = Math.min(1.6, Math.sqrt(gmVis / Math.max(Math.pow(r, 3), 1)));
+        const r0t = s.rf * this.U;
+        const rOm = Math.min(1.6, Math.sqrt(gmVis / Math.max(r0t * r0t * r0t, 1)));
         const dA = clamp(rOm * 0.85, 0.02, 0.5);
         ctx.globalAlpha = alpha * 0.3;
         ctx.strokeStyle = s.col;
-        ctx.lineWidth = s.s * 0.7;
+        ctx.lineWidth = s.s * 0.7 * lwK;
         ctx.beginPath();
         ctx.ellipse(gcx, gcy, r, r * cosI, 0, s.th - dA, s.th);
         ctx.stroke();
       }
 
+      const sz0 = s.s * Math.pow(Z, 0.45);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = s.col;
       if (s.s > 1.25) {
         ctx.beginPath();
-        ctx.arc(x, y, s.s * 0.62, 0, TAU);
+        ctx.arc(x, y, sz0 * 0.62, 0, TAU);
         ctx.fill();
       } else {
-        ctx.fillRect(x, y, s.s, s.s);
+        ctx.fillRect(x, y, sz0, sz0);
       }
     }
     ctx.globalAlpha = 1;
@@ -450,7 +513,7 @@ export class Engine {
       ctx.restore();
 
       // metade posterior (sin θ < 0 → acima do centro)
-      this.drawDiskSide(ctx, p, dcx, dcy, cosId, sinI, rs, diskScale, accK, true, dts);
+      this.drawDiskSide(ctx, p, dcx, dcy, cosId, sinI, rs, diskScale, accK, true, dts, lwK);
     }
 
     /* ================= sombra + anel de fótons ================= */
@@ -476,17 +539,17 @@ export class Engine {
 
     // anel de fótons
     ctx.strokeStyle = `rgba(255,228,175,${0.28 + 0.5 * Math.min(acc, 1)})`;
-    ctx.lineWidth = 3.6;
+    ctx.lineWidth = 3.6 * lwK;
     ctx.beginPath();
     ctx.arc(cx, cy, 2.62 * rs, 0, TAU);
     ctx.stroke();
     ctx.strokeStyle = "rgba(255,240,205,0.92)";
-    ctx.lineWidth = 1.25;
+    ctx.lineWidth = 1.25 * lwK;
     ctx.beginPath();
     ctx.arc(cx, cy, 2.62 * rs, 0, TAU);
     ctx.stroke();
     ctx.strokeStyle = "rgba(150,200,255,0.22)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = lwK;
     ctx.beginPath();
     ctx.arc(cx, cy, shadowR, 0, TAU);
     ctx.stroke();
@@ -508,7 +571,7 @@ export class Engine {
 
     /* --- metade frontal do disco --- */
     if (p.disk) {
-      this.drawDiskSide(ctx, p, dcx, dcy, cosId, sinI, rs, diskScale, accK, false, dts);
+      this.drawDiskSide(ctx, p, dcx, dcy, cosId, sinI, rs, diskScale, accK, false, dts, lwK);
     }
 
     /* ================= jatos relativísticos ================= */
@@ -519,10 +582,10 @@ export class Engine {
         j.t += j.sp * dts * (0.55 + acc);
         if (j.t > 1) j.t -= 1;
         const d = j.t * len;
-        const x = cx + j.drift * d * 0.22 + Math.sin(j.t * 7 + j.ph) * j.amp * j.t;
+        const x = cx + j.drift * d * 0.22 + Math.sin(j.t * 7 + j.ph) * j.amp * j.t * Z;
         const y = cy - j.side * (d + shadowR * 0.9);
         const a = Math.pow(1 - j.t, 1.7) * 0.5 * jetA;
-        const sz = (1 - j.t) * 2.6 + 0.6;
+        const sz = ((1 - j.t) * 2.6 + 0.6) * Math.pow(Z, 0.6);
         ctx.globalAlpha = a;
         ctx.fillStyle = j.side > 0 ? "#bfe0ff" : "#9ec8ff";
         ctx.beginPath();
@@ -559,21 +622,25 @@ export class Engine {
     ctx.beginPath();
     ctx.ellipse(cx, cy, rp, rp * cosId, 0, this.probeTh - 0.45, this.probeTh);
     ctx.stroke();
-    const pg = ctx.createRadialGradient(pxs, pys, 0, pxs, pys, 9);
+    const glowR = 9 * Math.pow(Z, 0.5);
+    const pg = ctx.createRadialGradient(pxs, pys, 0, pxs, pys, glowR);
     pg.addColorStop(0, "rgba(153,246,228,0.9)");
     pg.addColorStop(1, "rgba(94,234,212,0)");
     ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.arc(pxs, pys, 9, 0, TAU);
+    ctx.arc(pxs, pys, glowR, 0, TAU);
     ctx.fill();
     ctx.fillStyle = "#eafffb";
     ctx.beginPath();
-    ctx.arc(pxs, pys, 2.1, 0, TAU);
+    ctx.arc(pxs, pys, 2.1 * Math.pow(Z, 0.5), 0, TAU);
     ctx.fill();
 
-    /* ================= vinheta ================= */
+    /* ================= vinheta (fixa na tela, independente da câmera) ================= */
     ctx.globalCompositeOperation = "source-over";
-    const vg = ctx.createRadialGradient(cx, cy, U * 0.3, cx, cy, Math.max(this.w, this.h) * 0.74);
+    const vg = ctx.createRadialGradient(
+      this.cx, this.cy, this.U * 0.3,
+      this.cx, this.cy, Math.max(this.w, this.h) * 0.74
+    );
     vg.addColorStop(0, "rgba(2,3,8,0)");
     vg.addColorStop(1, "rgba(2,3,8,0.62)");
     ctx.fillStyle = vg;
@@ -583,7 +650,7 @@ export class Engine {
     this.fpsFrames++;
     this.fpsTime += dt;
     if (this.fpsTime >= 1) {
-      this.onFps?.(Math.round(this.fpsFrames / this.fpsTime));
+      this.onHud?.(Math.round(this.fpsFrames / this.fpsTime), this.zoomCur);
       this.fpsFrames = 0;
       this.fpsTime = 0;
     }
@@ -600,7 +667,8 @@ export class Engine {
     diskScale: number,
     accK: number,
     far: boolean,
-    dts: number
+    dts: number,
+    lwK: number
   ) {
     const massN = p.mass / 4.3e6;
     ctx.lineCap = "round";
@@ -626,7 +694,7 @@ export class Engine {
       const dA = clamp(om * dts * 2.4 + 0.028, 0.028, 0.5);
       ctx.globalAlpha = clamp(alpha, 0, 0.95);
       ctx.strokeStyle = `hsla(${hue}, 95%, ${lit}%, 1)`;
-      ctx.lineWidth = d.s;
+      ctx.lineWidth = d.s * lwK;
       ctx.beginPath();
       ctx.ellipse(dcx, dcy, rpx, rpx * cosId, 0, d.th - dA, d.th);
       ctx.stroke();
