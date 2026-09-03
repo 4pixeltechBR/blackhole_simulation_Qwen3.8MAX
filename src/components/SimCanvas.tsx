@@ -23,6 +23,8 @@ const SimCanvas = forwardRef<SimCanvasHandle, Props>(function SimCanvas(
   const dragRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef(0);
+  const downInfoRef = useRef<{ id: number; x: number; y: number; t: number } | null>(null);
+  const lastTapRef = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
 
   paramsRef.current = params;
   hudRef.current = onHud;
@@ -70,9 +72,13 @@ const SimCanvas = forwardRef<SimCanvasHandle, Props>(function SimCanvas(
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointersRef.current.size === 1) {
         dragRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        downInfoRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
         canvas.classList.add("dragging");
       } else {
+        // segundo dedo chegou → pinça (cancela o arrasto e a detecção de toque)
         dragRef.current = null;
+        downInfoRef.current = null;
+        canvas.classList.remove("dragging");
         const pts = [...pointersRef.current.values()];
         pinchRef.current = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       }
@@ -114,11 +120,37 @@ const SimCanvas = forwardRef<SimCanvasHandle, Props>(function SimCanvas(
 
     const onUp = (e: PointerEvent) => {
       pointersRef.current.delete(e.pointerId);
+      const di = downInfoRef.current;
+
+      // toque duplo explícito (mais confiável que dblclick no iOS)
+      if (di && di.id === e.pointerId) {
+        const moved = Math.hypot(e.clientX - di.x, e.clientY - di.y);
+        const dt = performance.now() - di.t;
+        if (moved < 14 && dt < 350) {
+          const now = performance.now();
+          const lt = lastTapRef.current;
+          if (now - lt.t < 380 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 60) {
+            engine.resetView();
+            lastTapRef.current = { t: 0, x: 0, y: 0 };
+          } else {
+            lastTapRef.current = { t: now, x: e.clientX, y: e.clientY };
+          }
+        }
+      }
+      downInfoRef.current = null;
+
       if (dragRef.current?.id === e.pointerId) {
         dragRef.current = null;
         canvas.classList.remove("dragging");
       }
       if (pointersRef.current.size < 2) pinchRef.current = 0;
+
+      // pinça → arrasto: se sobrou um dedo, ele assume o pan sem "pulo"
+      if (pointersRef.current.size === 1) {
+        const [id, pt] = [...pointersRef.current.entries()][0];
+        dragRef.current = { id, x: pt.x, y: pt.y };
+        canvas.classList.add("dragging");
+      }
     };
 
     const onDbl = () => engine.resetView();
