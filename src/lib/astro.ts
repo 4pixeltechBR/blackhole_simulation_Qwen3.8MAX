@@ -14,6 +14,7 @@ export interface SimParams {
   tilt: number; // inclinação da vista em graus (0 = face, 84 = bordo)
   probeR: number; // raio da sonda em unidades de rs (3..30)
   starCount: number;
+  presetId: string;
   lensing: boolean;
   disk: boolean;
   jets: boolean;
@@ -129,25 +130,25 @@ export const PRESETS: Preset[] = [
     id: "cygx1",
     name: "Cygnus X-1",
     note: "buraco negro estelar · 21 M☉",
-    patch: { mass: 21, accretion: 0.32, tilt: 58, jets: true, probeR: 6 },
+    patch: { presetId: "cygx1", mass: 21, accretion: 0.32, tilt: 58, jets: true, probeR: 6 },
   },
   {
     id: "sgra",
     name: "Sgr A*",
     note: "centro da Via Láctea · 4,3×10⁶ M☉",
-    patch: { mass: 4.3e6, accretion: 0.18, tilt: 62, jets: false, probeR: 6 },
+    patch: { presetId: "sgra", mass: 4.3e6, accretion: 0.18, tilt: 62, jets: false, probeR: 6 },
   },
   {
     id: "quasar",
     name: "Quasar",
     note: "núcleo ativo · 2×10⁸ M☉",
-    patch: { mass: 2e8, accretion: 0.92, tilt: 52, jets: true, probeR: 8 },
+    patch: { presetId: "quasar", mass: 2e8, accretion: 0.92, tilt: 52, jets: true, probeR: 8 },
   },
   {
     id: "m87",
     name: "M87*",
     note: "gigante do aglomerado de Virgem · 6,5×10⁹ M☉",
-    patch: { mass: 6.5e9, accretion: 0.4, tilt: 70, jets: true, probeR: 10 },
+    patch: { presetId: "m87", mass: 6.5e9, accretion: 0.4, tilt: 70, jets: true, probeR: 10 },
   },
 ];
 

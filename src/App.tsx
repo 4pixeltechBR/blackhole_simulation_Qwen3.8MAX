@@ -12,6 +12,7 @@ const INITIAL: SimParams = {
   tilt: 62,
   probeR: 6,
   starCount: 1800,
+  presetId: "sgra",
   lensing: true,
   disk: true,
   jets: true,
@@ -67,7 +68,7 @@ export default function App() {
             {params.paused ? "SIMULAÇÃO PAUSADA" : "INTEGRAÇÃO EM TEMPO REAL"}
           </span>
           <span className="hidden sm:inline text-zinc-600">
-            arraste p/ mover · scroll p/ zoom · 2× clique recentra
+            arraste · zoom no cursor · aproxime-se p/ revelar os astros
           </span>
         </div>
       </header>

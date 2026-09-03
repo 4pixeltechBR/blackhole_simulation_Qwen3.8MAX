@@ -10,7 +10,7 @@ interface Props {
 
 export default function ControlPanel({ params, sound, onPatch, onSound, defaultOpen = true }: Props & { defaultOpen?: boolean }) {
   const logM = sliderFromMass(params.mass);
-  const activePreset = PRESETS.find((p) => Math.abs((p.patch.mass ?? 0) - params.mass) < 1e-6)?.id;
+  const activePreset = PRESETS.find((p) => p.id === params.presetId)?.id;
 
   return (
     <Panel title="Parâmetros físicos" defaultOpen={defaultOpen} className="w-[300px] max-w-[calc(100vw-2rem)]">

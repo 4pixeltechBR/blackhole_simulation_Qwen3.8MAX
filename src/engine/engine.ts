@@ -1,4 +1,5 @@
 import type { SimParams } from "../lib/astro";
+import { COMPANIONS, type Companion } from "../lib/companions";
 
 /* ============================================================
    Motor de renderização — buraco negro no centro galáctico
@@ -87,6 +88,9 @@ export class Engine {
   private tSim = 0;
   private tWall = 0;
   private probeTh = 0.9;
+
+  /** ângulo orbital atual de cada astro nomeado (chaveado por id) */
+  private compTh = new Map<string, number>();
 
   private px = 0;
   private py = 0;
@@ -635,6 +639,9 @@ export class Engine {
     ctx.arc(pxs, pys, 2.1 * Math.pow(Z, 0.5), 0, TAU);
     ctx.fill();
 
+    /* ================= astros nomeados (aparecem com o zoom) ================= */
+    this.drawCompanions(ctx, p, dcx, dcy, Z, cosId, dts, lwK);
+
     /* ================= vinheta (fixa na tela, independente da câmera) ================= */
     ctx.globalCompositeOperation = "source-over";
     const vg = ctx.createRadialGradient(
@@ -701,4 +708,331 @@ export class Engine {
     }
     ctx.globalAlpha = 1;
   }
+
+  /* --------------------- astros nomeados --------------------- */
+
+  private drawCompanions(
+    ctx: CanvasRenderingContext2D,
+    p: SimParams,
+    ccx: number,
+    ccy: number,
+    Z: number,
+    cosId: number,
+    dts: number,
+    lwK: number
+  ) {
+    const list = COMPANIONS[p.presetId];
+    if (!list || list.length === 0) return;
+
+    const massN = p.mass / 4.3e6;
+    const gmVis = massN * 2.2e4 * Math.pow(this.U / 900, 3);
+    const sizeK = Math.pow(Z, 0.6);
+
+    // posição calculada de cada astro (usada nas duas passadas)
+    const placed: { c: Companion; x: number; y: number; r: number; labelA: number }[] = [];
+
+    /* --- passada 1: órbitas, vento e corpos (composição aditiva) --- */
+    for (const c of list) {
+      const ecc = c.ecc ?? 0;
+      const bodyR = c.size * sizeK;
+      const labelA = clamp((Z - c.labelZoom) / 0.45, 0, 1);
+      let x = ccx;
+      let y = ccy;
+
+      if (c.kind === "knot") {
+        const d = (c.distFrac ?? 0.2) * this.U * Z;
+        const side = c.side ?? 1;
+        x = ccx + Math.sin(this.tWall * 0.8 + c.th0) * d * 0.03;
+        y = ccy - side * d;
+      } else {
+        const a = (c.rFrac ?? 0.2) * this.U;
+        const omBase = Math.min(1.6, Math.sqrt(gmVis / Math.max(a * a * a, 1)));
+        const om = omBase * (c.omScale ?? 1);
+        const th = (this.compTh.get(c.id) ?? c.th0) + om * dts;
+        this.compTh.set(c.id, th);
+        const rr = ((a * (1 - ecc * ecc)) / (1 + ecc * Math.cos(th))) * Z;
+        x = ccx + Math.cos(th) * rr;
+        y = ccy + Math.sin(th) * rr * cosId;
+
+        // órbita tracejada surge pouco antes da etiqueta
+        const pathA = clamp((Z - (c.labelZoom - 0.6)) / 0.5, 0, 1) * 0.3;
+        if (pathA > 0.015) {
+          ctx.setLineDash([3, 5]);
+          ctx.strokeStyle = `rgba(252,211,77,${pathA})`;
+          ctx.lineWidth = 1 * lwK;
+          ctx.beginPath();
+          for (let i = 0; i <= 72; i++) {
+            const a2 = (i / 72) * TAU;
+            const r2 = ((a * (1 - ecc * ecc)) / (1 + ecc * Math.cos(a2))) * Z;
+            const px2 = ccx + Math.cos(a2) * r2;
+            const py2 = ccy + Math.sin(a2) * r2 * cosId;
+            if (i === 0) ctx.moveTo(px2, py2);
+            else ctx.lineTo(px2, py2);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        if (c.wind) this.drawWind(ctx, x, y, ccx, ccy, Z, bodyR, c);
+      }
+
+      this.drawCompanionBody(ctx, c, x, y, bodyR, Z);
+      placed.push({ c, x, y, r: bodyR, labelA });
+    }
+
+    /* --- passada 2: colchetes + etiquetas (composição normal) --- */
+    ctx.globalCompositeOperation = "source-over";
+    for (const it of placed) {
+      if (it.labelA <= 0.02) continue;
+      this.drawBrackets(ctx, it.x, it.y, it.r, it.labelA);
+      this.drawLabel(ctx, it.x, it.y, it.r, it.c.name, it.c.sub, it.labelA);
+    }
+    ctx.globalCompositeOperation = "lighter";
+  }
+
+  private drawCompanionBody(
+    ctx: CanvasRenderingContext2D,
+    c: Companion,
+    x: number,
+    y: number,
+    bodyR: number,
+    Z: number
+  ) {
+    const [gr, gg, gb] = c.glow.split(",").map(Number);
+    const pulse = 1 + 0.16 * Math.sin(this.tWall * 2.1 + c.th0);
+
+    if (c.kind === "cloud") {
+      // nuvem difusa: três lóbulos ao longo da tangente
+      const th = this.compTh.get(c.id) ?? c.th0;
+      const tx = -Math.sin(th);
+      const ty = Math.cos(th);
+      for (let k = -1; k <= 1; k++) {
+        const off = k * bodyR * 1.5;
+        const rad = bodyR * (2.1 - Math.abs(k) * 0.5) * pulse;
+        const g = ctx.createRadialGradient(x + tx * off, y + ty * off, 0, x + tx * off, y + ty * off, rad);
+        g.addColorStop(0, `rgba(${gr},${gg},${gb},${0.42 - Math.abs(k) * 0.12})`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x + tx * off, y + ty * off, rad, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = c.col;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 0.5, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    if (c.kind === "knot") {
+      // nó de jato: brilho + espícula vertical
+      const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 5);
+      g.addColorStop(0, `rgba(${gr},${gg},${gb},0.55)`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 5, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${gr},${gg},${gb},0.4)`;
+      ctx.lineWidth = bodyR * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y - bodyR * 4.5);
+      ctx.lineTo(x, y + bodyR * 4.5);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 0.8, 0, TAU);
+      ctx.fill();
+      return;
+    }
+
+    if (c.kind === "cluster") {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 3.4);
+      g.addColorStop(0, `rgba(${gr},${gg},${gb},0.5)`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 3.4, 0, TAU);
+      ctx.fill();
+      for (let k = 0; k < 7; k++) {
+        const ang = c.th0 + k * 0.9;
+        const d = bodyR * (1.5 + (k % 3) * 0.7);
+        ctx.fillStyle = c.col;
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(ang) * d, y + Math.sin(ang) * d, 1.1 * Math.pow(Z, 0.6), 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    if (c.kind === "galaxy") {
+      // galáxia anã elíptica + cauda de maré em direção ao buraco negro
+      const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 4);
+      g.addColorStop(0, `rgba(${gr},${gg},${gb},0.55)`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1, 0.6);
+      ctx.beginPath();
+      ctx.arc(0, 0, bodyR * 4, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = c.col;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 0.9, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // estrela: brilho + núcleo + picos de difração
+    const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 4.5);
+    g.addColorStop(0, `rgba(${gr},${gg},${gb},0.6)`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, bodyR * 4.5 * pulse, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${gr},${gg},${gb},0.35)`;
+    ctx.lineWidth = 1;
+    const sp = bodyR * 5;
+    ctx.beginPath();
+    ctx.moveTo(x - sp, y);
+    ctx.lineTo(x + sp, y);
+    ctx.moveTo(x, y - sp);
+    ctx.lineTo(x, y + sp);
+    ctx.stroke();
+    ctx.fillStyle = c.col;
+    ctx.beginPath();
+    ctx.arc(x, y, bodyR * 0.9, 0, TAU);
+    ctx.fill();
+  }
+
+  private drawWind(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    sy: number,
+    tx: number,
+    ty: number,
+    Z: number,
+    bodyR: number,
+    c: Companion
+  ) {
+    const dx = tx - sx;
+    const dy = ty - sy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const px = -ny;
+    const py = nx;
+    const [gr, gg, gb] = c.glow.split(",").map(Number);
+
+    for (let k = -1; k <= 1; k++) {
+      const bow = k * 24 * Z;
+      const cpx = (sx + tx) / 2 + px * bow;
+      const cpy = (sy + ty) / 2 + py * bow;
+      const grad = ctx.createLinearGradient(sx, sy, tx, ty);
+      grad.addColorStop(0, `rgba(${gr},${gg},${gb},0.4)`);
+      grad.addColorStop(0.6, "rgba(255,170,80,0.22)");
+      grad.addColorStop(1, "rgba(255,120,50,0)");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = (2.4 - Math.abs(k) * 0.7) * Math.pow(Z, 0.55);
+      ctx.beginPath();
+      ctx.moveTo(sx + nx * bodyR * 2, sy + ny * bodyR * 2);
+      ctx.quadraticCurveTo(cpx, cpy, tx - nx * 26 * Z, ty - ny * 26 * Z);
+      ctx.stroke();
+    }
+  }
+
+  private drawBrackets(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    alpha: number
+  ) {
+    const s = r + 7;
+    const L = Math.min(7, s * 0.55);
+    ctx.strokeStyle = `rgba(252,211,77,${0.75 * alpha})`;
+    ctx.lineWidth = 1.2;
+    for (const sx of [1, -1]) {
+      for (const sy of [1, -1]) {
+        ctx.beginPath();
+        ctx.moveTo(x + sx * s, y + sy * (s - L));
+        ctx.lineTo(x + sx * s, y + sy * s);
+        ctx.lineTo(x + sx * (s - L), y + sy * s);
+        ctx.stroke();
+      }
+    }
+  }
+
+  private drawLabel(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    name: string,
+    sub: string,
+    alpha: number
+  ) {
+    const lx = x + r + 16;
+    const ly = y - r - 8;
+
+    // linha-guia
+    ctx.strokeStyle = `rgba(252,211,77,${0.45 * alpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + r + 3, y - 3);
+    ctx.lineTo(lx, ly);
+    ctx.stroke();
+
+    const nameFont = '600 11px "Space Grotesk", sans-serif';
+    const subFont = '500 8.5px "IBM Plex Mono", monospace';
+    ctx.font = nameFont;
+    const w1 = ctx.measureText(name).width;
+    ctx.font = subFont;
+    const w2 = ctx.measureText(sub).width;
+    const w = Math.max(w1, w2) + 16;
+    const h = 32;
+    const bx = lx;
+    const by = ly - 21;
+
+    roundedRect(ctx, bx, by, w, h, 5);
+    ctx.fillStyle = `rgba(4,5,12,${0.8 * alpha})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(252,211,77,${0.35 * alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textBaseline = "alphabetic";
+    ctx.font = nameFont;
+    ctx.fillStyle = `rgba(253,230,138,${alpha})`;
+    ctx.fillText(name, bx + 8, by + 14);
+    ctx.font = subFont;
+    ctx.fillStyle = `rgba(156,163,175,${alpha})`;
+    ctx.fillText(sub, bx + 8, by + 26);
+  }
+}
+
+function roundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
