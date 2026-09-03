@@ -150,6 +150,12 @@ export const PRESETS: Preset[] = [
     note: "gigante do aglomerado de Virgem · 6,5×10⁹ M☉",
     patch: { presetId: "m87", mass: 6.5e9, accretion: 0.4, tilt: 70, jets: true, probeR: 10 },
   },
+  {
+    id: "gargantua",
+    name: "Gargantua",
+    note: "Interestelar · 10⁸ M☉ · giro extremo",
+    patch: { presetId: "gargantua", mass: 1e8, accretion: 0.42, tilt: 62, jets: false, probeR: 6 },
+  },
 ];
 
 export function massFromSlider(v: number): number {

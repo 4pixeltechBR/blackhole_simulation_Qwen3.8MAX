@@ -891,6 +891,54 @@ export class Engine {
       return;
     }
 
+    if (c.kind === "planet") {
+      // planeta: esfera sombreada — o terminador volta-se para o buraco negro
+      const bx = this.cx + this.panCurX;
+      const by = this.cy + this.panCurY;
+      const toC = Math.atan2(by - y, bx - x);
+      const hx = x + Math.cos(toC) * bodyR * 0.45;
+      const hy = y + Math.sin(toC) * bodyR * 0.45;
+      const g = ctx.createRadialGradient(hx, hy, bodyR * 0.1, x, y, bodyR);
+      g.addColorStop(0, c.col2 ?? "#ffffff");
+      g.addColorStop(0.55, c.col);
+      g.addColorStop(1, "rgba(3,7,15,0.95)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR, 0, TAU);
+      ctx.fill();
+      // tênue halo atmosférico
+      ctx.strokeStyle = `rgba(${gr},${gg},${gb},0.35)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 1.3, 0, TAU);
+      ctx.stroke();
+      return;
+    }
+
+    if (c.kind === "ship") {
+      // nave: casco orientado na direção da órbita + brilho dos motores
+      const th = this.compTh.get(c.id) ?? c.th0;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(th + Math.PI / 2);
+      const eg = ctx.createRadialGradient(0, bodyR * 1.6, 0, 0, bodyR * 1.6, bodyR * 3);
+      eg.addColorStop(0, "rgba(125,235,255,0.55)");
+      eg.addColorStop(1, "rgba(125,235,255,0)");
+      ctx.fillStyle = eg;
+      ctx.beginPath();
+      ctx.arc(0, bodyR * 1.6, bodyR * 3, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#e8f6ff";
+      ctx.beginPath();
+      ctx.moveTo(0, -bodyR * 1.5);
+      ctx.lineTo(bodyR * 0.85, bodyR * 1.1);
+      ctx.lineTo(-bodyR * 0.85, bodyR * 1.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
     // estrela: brilho + núcleo + picos de difração
     const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 4.5);
     g.addColorStop(0, `rgba(${gr},${gg},${gb},0.6)`);

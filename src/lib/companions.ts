@@ -1,7 +1,7 @@
 /* Catálogo de astros nomeados que orbitam cada buraco negro.
    As etiquetas só surgem quando a câmera se aproxima (labelZoom). */
 
-export type CompanionKind = "star" | "cloud" | "knot" | "cluster" | "galaxy";
+export type CompanionKind = "star" | "cloud" | "knot" | "cluster" | "galaxy" | "planet" | "ship";
 
 export interface Companion {
   id: string;
@@ -23,6 +23,8 @@ export interface Companion {
   size: number;
   /** cor do núcleo */
   col: string;
+  /** cor do destaque (terminador iluminado dos planetas) */
+  col2?: string;
   /** cor do brilho como "r,g,b" */
   glow: string;
   /** zoom mínimo para a etiqueta aparecer */
@@ -194,6 +196,97 @@ export const COMPANIONS: Record<string, Companion[]> = {
       col: "#ffe7c2",
       glow: "255,214,160",
       labelZoom: 1.2,
+    },
+  ],
+
+  /* ---- Gargantua (Interestelar): 10⁸ M☉ em rotação quase máxima ---- */
+  gargantua: [
+    {
+      id: "g-miller",
+      kind: "planet",
+      name: "Miller",
+      sub: "1 hora aqui ≈ 7 anos na Terra",
+      rFrac: 0.085,
+      ecc: 0,
+      th0: 2.1,
+      omScale: 1,
+      size: 3.4,
+      col: "#3f9fd8",
+      col2: "#c9ecff",
+      glow: "120,200,255",
+      labelZoom: 1.25,
+    },
+    {
+      id: "g-lander",
+      kind: "ship",
+      name: "Lander",
+      sub: "veículo de pouso · desceu a Miller",
+      rFrac: 0.071,
+      ecc: 0,
+      th0: 1.82,
+      omScale: 1.08,
+      size: 2.1,
+      col: "#e8f6ff",
+      glow: "125,235,255",
+      labelZoom: 1.75,
+    },
+    {
+      id: "g-ranger",
+      kind: "ship",
+      name: "Ranger",
+      sub: "módulo de descida · escolta Miller",
+      rFrac: 0.099,
+      ecc: 0,
+      th0: 2.46,
+      omScale: 0.94,
+      size: 1.9,
+      col: "#e8f6ff",
+      glow: "125,235,255",
+      labelZoom: 1.75,
+    },
+    {
+      id: "g-endurance",
+      kind: "ship",
+      name: "Endurance",
+      sub: "nave-mãe · estação anelar",
+      rFrac: 0.148,
+      ecc: 0,
+      th0: 5.2,
+      omScale: 0.78,
+      size: 2.6,
+      col: "#e8f6ff",
+      glow: "125,235,255",
+      labelZoom: 1.45,
+    },
+    {
+      id: "g-mann",
+      kind: "planet",
+      name: "Mann",
+      sub: "planeta de gelo do Dr. Mann",
+      rFrac: 0.21,
+      ecc: 0,
+      th0: 3.9,
+      omScale: 0.62,
+      size: 3,
+      col: "#8fb0c4",
+      col2: "#f4fbff",
+      glow: "200,225,240",
+      labelZoom: 1.3,
+    },
+    {
+      id: "g-edmunds",
+      kind: "planet",
+      name: "Edmunds",
+      sub: "planeta habitável da missão Lázaro",
+      rFrac: 0.33,
+      ecc: 0,
+      th0: 0.8,
+      omScale: 0.48,
+      size: 3.1,
+      col: "#c98f4e",
+      col2: "#ffe6b8",
+      glow: "255,205,130",
+      labelZoom: 1.15,
     },
   ],
 };
