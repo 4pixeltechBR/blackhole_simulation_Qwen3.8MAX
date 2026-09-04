@@ -7,6 +7,12 @@
 Crie uma demonstração de um buraco negro no centro de uma galaxia. Deve ter opção de dar zoom para ver os corpos celestes mais próximos, e mover a tela para os lados com clique do mouse. Deve ter o nome dos principais corpos celestes que giram ao redor de cada buraco negro que você colocar como opção. Mas os nomes só aparecessem quando déssemos zoom naquele corpo celeste em específico. Gere insights.
 ```
 
+---
+
+![Interface do Simulador de Buraco Negro](assets/screenshot.png)
+
+---
+
 Simulação física e astronômica em tempo real de buracos negros no centro de galáxias, com lentes gravitacionais de Einstein, disco de acreção com *Doppler beaming* relativístico, jatos de plasma e catálogo de corpos celestes em órbita com rotulagem inteligente sob aproximação de câmera.
 
 ---
