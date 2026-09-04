@@ -1,7 +1,7 @@
 /* Catálogo de astros nomeados que orbitam cada buraco negro.
    As etiquetas só surgem quando a câmera se aproxima e foca naquele astro em específico. */
 
-export type CompanionKind = "star" | "cloud" | "knot" | "cluster" | "galaxy" | "planet" | "ship";
+export type CompanionKind = "star" | "cloud" | "knot" | "cluster" | "galaxy" | "planet" | "ship" | "solarsystem";
 
 export interface Companion {
   id: string;
@@ -141,6 +141,24 @@ export const COMPANIONS: Record<string, Companion[]> = {
       col: "#c084fc",
       glow: "192,132,252",
       labelZoom: 1.3,
+    },
+    {
+      id: "solar-system",
+      kind: "solarsystem",
+      name: "Sistema Solar (Sol / Terra)",
+      sub: "Braço de Órion · Você está aqui 📍",
+      speed: "230 km/s (0,077% c)",
+      dist: "26.670 anos-luz (8,18 kpc)",
+      dilation: "1,00000000002×",
+      rFrac: 0.44,
+      ecc: 0.06,
+      th0: 1.15,
+      omScale: 0.18,
+      size: 4.0,
+      col: "#fbbf24",
+      col2: "#38bdf8",
+      glow: "251,191,36",
+      labelZoom: 1.0,
     },
   ],
 

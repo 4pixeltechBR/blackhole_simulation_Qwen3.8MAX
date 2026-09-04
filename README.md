@@ -31,7 +31,7 @@ Simulação física e astronômica em tempo real de buracos negros no centro de 
 ## 🪐 Buracos Negros Catalogados
 
 1. **Sagittarius A\*** (*Via Láctea* — $4,3 \times 10^6 M_\odot$)
-   - *Astros*: Estrela S2 (S0-2), Estrela S4714 (8% de $c$), Estrela S62 (período de 9,9 anos), Estrela S0-102, Nuvem de Gás G2 e Magnetar Pulsar PSR J1745-2900.
+   - *Astros*: **Sistema Solar (Sol / Terra — Braço de Órion, Você está aqui 📍)**, Estrela S2 (S0-2), Estrela S4714 (8% de $c$), Estrela S62 (período de 9,9 anos), Estrela S0-102, Nuvem de Gás G2 e Magnetar Pulsar PSR J1745-2900.
 2. **M87\*** (*Messier 87 / Virgo A* — $6,5 \times 10^9 M_\odot$)
    - *Astros*: Nó de Choque HST-1 (6c aparente), Lobo Terminal do Jato (0,99c), Aglomerado Globular, Galáxia Anã NGC 4486B em canibalização e Estrela TDE em espaguetificação.
 3. **Gargantua** (*Interestelar / Kerr* — $1,0 \times 10^8 M_\odot$)

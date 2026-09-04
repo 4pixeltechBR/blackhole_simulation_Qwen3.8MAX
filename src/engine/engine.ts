@@ -997,6 +997,99 @@ export class Engine {
       return;
     }
 
+    if (c.kind === "solarsystem") {
+      // Sistema Solar: Sol dourado com corona + anéis orbitais planetários + Terra (Pálido Ponto Azul)
+      const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 5);
+      g.addColorStop(0, "rgba(251,191,36,0.85)");
+      g.addColorStop(0.3, "rgba(245,158,11,0.3)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 5 * pulse, 0, TAU);
+      ctx.fill();
+
+      // Espículas / flares solares
+      ctx.strokeStyle = "rgba(251,191,36,0.5)";
+      ctx.lineWidth = 1.2;
+      const sp = bodyR * 4.5;
+      ctx.beginPath();
+      ctx.moveTo(x - sp, y);
+      ctx.lineTo(x + sp, y);
+      ctx.moveTo(x, y - sp);
+      ctx.lineTo(x, y + sp);
+      ctx.stroke();
+
+      // Núcleo do Sol
+      ctx.fillStyle = "#fffbeb";
+      ctx.beginPath();
+      ctx.arc(x, y, bodyR * 0.95, 0, TAU);
+      ctx.fill();
+
+      // Órbitas planetárias e Terra (Pálido Ponto Azul) visíveis ao aproximar
+      const orbR1 = bodyR * 2.2;
+      const orbR2 = bodyR * 3.6; // Órbita da Terra
+      const orbR3 = bodyR * 5.2; // Órbita de Júpiter
+
+      // Anéis orbitais tênues
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y, orbR1, 0, TAU);
+      ctx.stroke();
+
+      // Órbita da Terra destacada em ciano sutil
+      ctx.strokeStyle = "rgba(56,189,248,0.3)";
+      ctx.beginPath();
+      ctx.arc(x, y, orbR2, 0, TAU);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.beginPath();
+      ctx.arc(x, y, orbR3, 0, TAU);
+      ctx.stroke();
+
+      // A Terra (Pálido Ponto Azul)
+      const earthAngle = this.tWall * 1.6;
+      const ex = x + Math.cos(earthAngle) * orbR2;
+      const ey = y + Math.sin(earthAngle) * orbR2;
+
+      // Brilho da Terra
+      const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, 5 * Math.pow(Z, 0.4));
+      eg.addColorStop(0, "rgba(56,189,248,0.9)");
+      eg.addColorStop(1, "rgba(56,189,248,0)");
+      ctx.fillStyle = eg;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 5 * Math.pow(Z, 0.4), 0, TAU);
+      ctx.fill();
+
+      // Ponto Azul da Terra
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.arc(ex, ey, Math.max(1.8, 1.2 * Math.pow(Z, 0.5)), 0, TAU);
+      ctx.fill();
+
+      // Se ampliado (Z >= 1.8), desenha a órbita e pontinho da Lua
+      if (Z >= 1.8) {
+        const moonAngle = this.tWall * 4.5;
+        const moonDist = 4.2 * Math.pow(Z, 0.35);
+        const mx = ex + Math.cos(moonAngle) * moonDist;
+        const my = ey + Math.sin(moonAngle) * moonDist;
+
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.arc(ex, ey, moonDist, 0, TAU);
+        ctx.stroke();
+
+        ctx.fillStyle = "#f1f5f9";
+        ctx.beginPath();
+        ctx.arc(mx, my, 0.9 * Math.pow(Z, 0.25), 0, TAU);
+        ctx.fill();
+      }
+
+      return;
+    }
+
     // estrela: brilho + núcleo + picos de difração
     const g = ctx.createRadialGradient(x, y, 0, x, y, bodyR * 4.5);
     g.addColorStop(0, `rgba(${gr},${gg},${gb},0.6)`);
