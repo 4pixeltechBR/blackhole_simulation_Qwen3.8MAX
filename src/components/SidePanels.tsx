@@ -75,3 +75,59 @@ export function PhysicsPanel({ defaultOpen }: { defaultOpen: boolean }) {
     </Panel>
   );
 }
+
+/* ---------------- catálogo de astros em órbita ---------------- */
+
+import { COMPANIONS } from "../lib/companions";
+
+export function CompanionsPanel({
+  presetId,
+  onFocus,
+  defaultOpen = true,
+}: {
+  presetId: string;
+  onFocus: (id: string) => void;
+  defaultOpen?: boolean;
+}) {
+  const list = COMPANIONS[presetId] || COMPANIONS[presetId === "quasar" ? "ton618" : "sgra"] || [];
+
+  return (
+    <Panel
+      title="Astros em Órbita"
+      defaultOpen={defaultOpen}
+      className="w-[280px] max-w-[calc(100vw-2rem)]"
+      badge={
+        <span className="font-num text-[9px] text-amber-400/90 tracking-wider">
+          {list.length} astros
+        </span>
+      }
+    >
+      <div className="text-[9.5px] text-zinc-400 mb-2 leading-relaxed">
+        🔍 Os nomes surgem na tela ao <strong>aproximar com o zoom</strong>. Clique em um astro para centralizar e focar:
+      </div>
+      <div className="space-y-1.5 max-h-[220px] overflow-y-auto thin-scroll pr-1">
+        {list.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onFocus(c.id)}
+            className="w-full text-left p-2 rounded-lg border border-white/10 bg-white/[0.03] hover:border-amber-400/40 hover:bg-white/[0.07] transition-all duration-150 cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.col }} />
+                <span className="text-[11px] font-semibold text-zinc-200 group-hover:text-amber-200 transition-colors">
+                  {c.name}
+                </span>
+              </div>
+              <span className="font-num text-[8.5px] text-zinc-500">
+                zoom ≥ {c.labelZoom.toFixed(1)}×
+              </span>
+            </div>
+            <div className="text-[9px] text-zinc-400 mt-0.5 truncate">{c.sub}</div>
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+}

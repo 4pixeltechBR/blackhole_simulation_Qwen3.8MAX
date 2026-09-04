@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import SimCanvas, { type SimCanvasHandle } from "./components/SimCanvas";
 import ControlPanel from "./components/ControlPanel";
-import { PhysicsPanel, TelemetryPanel } from "./components/SidePanels";
+import { CompanionsPanel, PhysicsPanel, TelemetryPanel } from "./components/SidePanels";
 import { useDrone } from "./hooks/useDrone";
 import { computeTelemetry, fmtNum, type SimParams } from "./lib/astro";
 
@@ -73,9 +73,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* ---------- telemetria (direita) ---------- */}
-      <div className={`fixed right-4 md:right-6 z-10 ${isMobile ? "top-[104px]" : "top-7"} animate-rise`} style={{ animationDelay: "0.12s" }}>
+      {/* ---------- telemetria & astros orbitais (direita) ---------- */}
+      <div className={`fixed right-4 md:right-6 z-10 ${isMobile ? "top-[90px]" : "top-6"} flex flex-col gap-2.5 max-h-[calc(100vh-80px)] overflow-y-auto thin-scroll animate-rise`} style={{ animationDelay: "0.12s" }}>
         <TelemetryPanel t={telemetry} p={params} fps={hud.fps} defaultOpen={!isMobile} />
+        <CompanionsPanel
+          presetId={params.presetId}
+          onFocus={(id) => simRef.current?.focusCompanion(id)}
+          defaultOpen={!isMobile}
+        />
       </div>
 
       {/* ---------- HUD da câmera ---------- */}

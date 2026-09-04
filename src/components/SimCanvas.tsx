@@ -5,6 +5,7 @@ import type { SimParams } from "../lib/astro";
 export interface SimCanvasHandle {
   zoomBy: (factor: number) => void;
   reset: () => void;
+  focusCompanion: (id: string) => void;
 }
 
 interface Props {
@@ -36,6 +37,7 @@ const SimCanvas = forwardRef<SimCanvasHandle, Props>(function SimCanvas(
       if (e && c) e.zoomAt(c.clientWidth / 2, c.clientHeight / 2, f);
     },
     reset: () => engineRef.current?.resetView(),
+    focusCompanion: (id: string) => engineRef.current?.focusCompanion(id),
   }));
 
   useEffect(() => {
@@ -189,7 +191,7 @@ const SimCanvas = forwardRef<SimCanvasHandle, Props>(function SimCanvas(
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 h-full w-full cursor-grab touch-none select-none dragging:cursor-grabbing"
+      className="absolute inset-0 h-full w-full cursor-grab touch-none select-none"
     />
   );
 });

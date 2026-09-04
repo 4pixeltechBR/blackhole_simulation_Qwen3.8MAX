@@ -25,7 +25,7 @@ export default function ControlPanel({ params, sound, onPatch, onSound, defaultO
               activePreset === p.id
                 ? "border-amber-400/60 bg-amber-400/10 shadow-[0_0_14px_-4px_rgba(245,158,11,0.5)]"
                 : "border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]"
-            } ${p.id === "gargantua" ? "col-span-2 !border-amber-400/30 bg-gradient-to-r from-amber-400/[0.06] to-transparent" : ""}`}
+            } ${p.id === "ton618" ? "col-span-2 !border-purple-400/40 bg-gradient-to-r from-purple-400/[0.08] to-transparent" : ""}`}
           >
             <span className="block text-[11.5px] font-semibold text-zinc-100 leading-tight">{p.name}</span>
             <span className="block text-[9px] text-zinc-500 leading-tight mt-0.5">{p.note}</span>

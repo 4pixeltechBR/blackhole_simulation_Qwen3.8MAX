@@ -51,6 +51,11 @@ body {
   color: #fffbeb;
 }
 
+canvas.dragging,
+.dragging {
+  cursor: grabbing !important;
+}
+
 /* ---------- painéis ---------- */
 .panel {
   background: linear-gradient(160deg, rgba(13, 17, 32, 0.82), rgba(6, 8, 16, 0.72));

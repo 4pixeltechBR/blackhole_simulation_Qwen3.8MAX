@@ -127,40 +127,34 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   {
-    id: "gargantua",
-    name: "Gargantua",
-    note: "Interestelar · 10⁸ M☉ · giro extremo",
-    patch: { presetId: "gargantua", mass: 1e8, accretion: 0.42, tilt: 62, jets: false, probeR: 6 },
-  },
-  {
-    id: "cygx1",
-    name: "Cygnus X-1",
-    note: "buraco negro estelar · 21 M☉",
-    patch: { presetId: "cygx1", mass: 21, accretion: 0.32, tilt: 58, jets: true, probeR: 6 },
-  },
-  {
     id: "sgra",
     name: "Sgr A*",
-    note: "centro da Via Láctea · 4,3×10⁶ M☉",
+    note: "Via Láctea · 4,3×10⁶ M☉",
     patch: { presetId: "sgra", mass: 4.3e6, accretion: 0.18, tilt: 62, jets: false, probeR: 6 },
-  },
-  {
-    id: "quasar",
-    name: "Quasar",
-    note: "núcleo ativo · 2×10⁸ M☉",
-    patch: { presetId: "quasar", mass: 2e8, accretion: 0.92, tilt: 52, jets: true, probeR: 8 },
   },
   {
     id: "m87",
     name: "M87*",
-    note: "gigante do aglomerado de Virgem · 6,5×10⁹ M☉",
+    note: "Virgo A · 6,5×10⁹ M☉ · Jato",
     patch: { presetId: "m87", mass: 6.5e9, accretion: 0.4, tilt: 70, jets: true, probeR: 10 },
   },
   {
     id: "gargantua",
     name: "Gargantua",
-    note: "Interestelar · 10⁸ M☉ · giro extremo",
+    note: "Interestelar · 10⁸ M☉ · Kerr",
     patch: { presetId: "gargantua", mass: 1e8, accretion: 0.42, tilt: 62, jets: false, probeR: 6 },
+  },
+  {
+    id: "cygx1",
+    name: "Cygnus X-1",
+    note: "Binária de Raios-X · 21 M☉",
+    patch: { presetId: "cygx1", mass: 21, accretion: 0.32, tilt: 58, jets: true, probeR: 6 },
+  },
+  {
+    id: "ton618",
+    name: "TON 618",
+    note: "Quasar Ultramassivo · 6,6×10¹⁰ M☉",
+    patch: { presetId: "ton618", mass: 6.6e10, accretion: 1.05, tilt: 48, jets: true, probeR: 12 },
   },
 ];
 

@@ -104,6 +104,9 @@ export class Engine {
   private panTY = 0;
   private panCurX = 0;
   private panCurY = 0;
+  private focusedCompanionId: string | null = null;
+  private currentPresetId = "sgra";
+  private currentTilt = (62 * Math.PI) / 180;
 
   private fpsFrames = 0;
   private fpsTime = 0;
@@ -225,7 +228,7 @@ export class Engine {
   /** Zoom mantendo o ponto de mundo sob (mx,my) fixo na tela */
   zoomAt(mx: number, my: number, factor: number) {
     const z0 = this.zoomT;
-    const z1 = clamp(z0 * factor, 0.55, 8);
+    const z1 = clamp(z0 * factor, 0.2, 45.0);
     if (Math.abs(z1 - z0) < 1e-6) return;
     const wx = (mx - this.cx - this.panTX) / z0;
     const wy = (my - this.cy - this.panTY) / z0;
@@ -239,6 +242,7 @@ export class Engine {
   panBy(dx: number, dy: number) {
     this.panTX += dx;
     this.panTY += dy;
+    this.focusedCompanionId = null; // Libera foco ao arrastar manualmente
     this.clampPan();
   }
 
@@ -246,6 +250,40 @@ export class Engine {
     this.zoomT = 1;
     this.panTX = 0;
     this.panTY = 0;
+    this.focusedCompanionId = null;
+  }
+
+  /** Voo de câmera e foco automático em um astro específico */
+  focusCompanion(id: string) {
+    this.focusedCompanionId = id;
+    const list = COMPANIONS[this.currentPresetId] || COMPANIONS.sgra;
+    const c = list?.find((it) => it.id === id);
+    if (!c) return;
+
+    // Alvo de zoom para visualização nítida
+    const targetZ = Math.max(c.labelZoom * 1.3, 2.5);
+    this.zoomT = clamp(targetZ, 0.2, 45.0);
+
+    const ecc = c.ecc ?? 0;
+    const th = this.compTh.get(c.id) ?? c.th0;
+    let wx = 0;
+    let wy = 0;
+
+    if (c.kind === "knot") {
+      const d = (c.distFrac ?? 0.2) * this.U;
+      const side = c.side ?? 1;
+      wx = Math.sin(this.tWall * 0.8 + c.th0) * d * 0.03;
+      wy = -side * d;
+    } else {
+      const a = (c.rFrac ?? 0.2) * this.U;
+      const rr = (a * (1 - ecc * ecc)) / (1 + ecc * Math.cos(th));
+      wx = Math.cos(th) * rr;
+      wy = Math.sin(th) * rr * Math.max(Math.cos(this.currentTilt), 0.07);
+    }
+
+    this.panTX = -wx * this.zoomT;
+    this.panTY = -wy * this.zoomT;
+    this.clampPan();
   }
 
   getZoom(): number {
@@ -253,7 +291,7 @@ export class Engine {
   }
 
   private clampPan() {
-    const lim = Math.max(this.w, this.h) * 0.85 * this.zoomT;
+    const lim = Math.max(this.w, this.h) * 2.5 * this.zoomT;
     this.panTX = clamp(this.panTX, -lim, lim);
     this.panTY = clamp(this.panTY, -lim, lim);
   }
@@ -291,6 +329,8 @@ export class Engine {
     const massN = p.mass / 4.3e6;
     const rs = this.rsPx(p.mass) * Z;
     const tilt = (p.tilt * Math.PI) / 180;
+    this.currentPresetId = p.presetId;
+    this.currentTilt = tilt;
     const cosI = Math.cos(tilt);
     const sinI = Math.sin(tilt);
     const cx = this.cx + this.panCurX;
@@ -721,12 +761,12 @@ export class Engine {
     dts: number,
     lwK: number
   ) {
-    const list = COMPANIONS[p.presetId];
+    const list = COMPANIONS[p.presetId] || COMPANIONS[p.presetId === "quasar" ? "ton618" : "sgra"];
     if (!list || list.length === 0) return;
 
     const massN = p.mass / 4.3e6;
     const gmVis = massN * 2.2e4 * Math.pow(this.U / 900, 3);
-    const sizeK = Math.pow(Z, 0.6);
+    const sizeK = Math.pow(Z, 0.55);
 
     // posição calculada de cada astro (usada nas duas passadas)
     const placed: { c: Companion; x: number; y: number; r: number; labelA: number }[] = [];
@@ -734,8 +774,7 @@ export class Engine {
     /* --- passada 1: órbitas, vento e corpos (composição aditiva) --- */
     for (const c of list) {
       const ecc = c.ecc ?? 0;
-      const bodyR = c.size * sizeK;
-      const labelA = clamp((Z - c.labelZoom) / 0.45, 0, 1);
+      const bodyR = Math.max(2.2, c.size * sizeK);
       let x = ccx;
       let y = ccy;
 
@@ -754,12 +793,12 @@ export class Engine {
         x = ccx + Math.cos(th) * rr;
         y = ccy + Math.sin(th) * rr * cosId;
 
-        // órbita tracejada surge pouco antes da etiqueta
-        const pathA = clamp((Z - (c.labelZoom - 0.6)) / 0.5, 0, 1) * 0.3;
+        // órbita tracejada surge suavemente conforme aproximamos
+        const pathA = clamp((Z - (c.labelZoom - 0.5)) / 0.8, 0, 1) * 0.28;
         if (pathA > 0.015) {
           ctx.setLineDash([3, 5]);
           ctx.strokeStyle = `rgba(252,211,77,${pathA})`;
-          ctx.lineWidth = 1 * lwK;
+          ctx.lineWidth = Math.min(2.5, 1 * lwK);
           ctx.beginPath();
           for (let i = 0; i <= 72; i++) {
             const a2 = (i / 72) * TAU;
@@ -777,15 +816,34 @@ export class Engine {
       }
 
       this.drawCompanionBody(ctx, c, x, y, bodyR, Z);
+
+      // CRITÉRIO RESTRITO DE EXIBIÇÃO DA ETIQUETA:
+      // O nome só aparece quando dermos zoom naquele corpo celeste específico!
+      const onScreen = x >= 10 && x <= this.w - 10 && y >= 10 && y <= this.h - 10;
+      const distToCenter = Math.hypot(x - this.cx, y - this.cy);
+      const maxFocusRadius = Math.min(this.w, this.h) * 0.44;
+      const isExplicit = this.focusedCompanionId === c.id;
+
+      let labelA = 0;
+      if (onScreen && (Z >= c.labelZoom || isExplicit)) {
+        if (isExplicit) {
+          labelA = clamp((Z - 0.8) / 0.4, 0, 1);
+        } else if (distToCenter <= maxFocusRadius) {
+          const zoomSurplus = Math.max(0, Z - c.labelZoom);
+          const centerFactor = 1 - (distToCenter / maxFocusRadius);
+          labelA = clamp(zoomSurplus * 1.6 + centerFactor * 0.5, 0, 1);
+        }
+      }
+
       placed.push({ c, x, y, r: bodyR, labelA });
     }
 
     /* --- passada 2: colchetes + etiquetas (composição normal) --- */
     ctx.globalCompositeOperation = "source-over";
     for (const it of placed) {
-      if (it.labelA <= 0.02) continue;
+      if (it.labelA <= 0.03) continue;
       this.drawBrackets(ctx, it.x, it.y, it.r, it.labelA);
-      this.drawLabel(ctx, it.x, it.y, it.r, it.c.name, it.c.sub, it.labelA);
+      this.drawLabel(ctx, it.x, it.y, it.r, it.c, it.labelA);
     }
     ctx.globalCompositeOperation = "lighter";
   }
@@ -1005,10 +1063,10 @@ export class Engine {
     r: number,
     alpha: number
   ) {
-    const s = r + 7;
-    const L = Math.min(7, s * 0.55);
-    ctx.strokeStyle = `rgba(252,211,77,${0.75 * alpha})`;
-    ctx.lineWidth = 1.2;
+    const s = r + 8;
+    const L = Math.min(8, s * 0.55);
+    ctx.strokeStyle = `rgba(252,211,77,${0.85 * alpha})`;
+    ctx.lineWidth = 1.3;
     for (const sx of [1, -1]) {
       for (const sy of [1, -1]) {
         ctx.beginPath();
@@ -1025,46 +1083,68 @@ export class Engine {
     x: number,
     y: number,
     r: number,
-    name: string,
-    sub: string,
+    c: Companion,
     alpha: number
   ) {
-    const lx = x + r + 16;
-    const ly = y - r - 8;
+    const hasExtra = !!(c.speed || c.dist || c.dilation);
+    const cardW = hasExtra ? 234 : 190;
+    const cardH = hasExtra ? 62 : 36;
 
-    // linha-guia
+    // Decide se desenha para a direita ou para a esquerda se estiver perto da borda
+    const placeLeft = x + r + 20 + cardW > this.w - 15;
+    const lx = placeLeft ? x - r - 18 - cardW : x + r + 18;
+    const ly = clamp(y - cardH / 2, 25, this.h - cardH - 25);
+
+    // Linha-guia
     ctx.strokeStyle = `rgba(252,211,77,${0.45 * alpha})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(x + r + 3, y - 3);
-    ctx.lineTo(lx, ly);
+    ctx.moveTo(placeLeft ? x - r - 4 : x + r + 4, y);
+    ctx.lineTo(placeLeft ? lx + cardW : lx, ly + cardH / 2);
     ctx.stroke();
 
-    const nameFont = '600 11px "Space Grotesk", sans-serif';
-    const subFont = '500 8.5px "IBM Plex Mono", monospace';
-    ctx.font = nameFont;
-    const w1 = ctx.measureText(name).width;
-    ctx.font = subFont;
-    const w2 = ctx.measureText(sub).width;
-    const w = Math.max(w1, w2) + 16;
-    const h = 32;
-    const bx = lx;
-    const by = ly - 21;
-
-    roundedRect(ctx, bx, by, w, h, 5);
-    ctx.fillStyle = `rgba(4,5,12,${0.8 * alpha})`;
+    // Ponto conector
+    ctx.fillStyle = "#fbbf24";
+    ctx.beginPath();
+    ctx.arc(placeLeft ? lx + cardW : lx, ly + cardH / 2, 2, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = `rgba(252,211,77,${0.35 * alpha})`;
+
+    // Fundo do cartão de telemetria
+    roundedRect(ctx, lx, ly, cardW, cardH, 6);
+    ctx.fillStyle = `rgba(6, 9, 22, ${0.88 * alpha})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(252,211,77,${0.38 * alpha})`;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.textBaseline = "alphabetic";
-    ctx.font = nameFont;
+    // Tarja lateral colorida
+    ctx.fillStyle = c.col;
+    ctx.fillRect(placeLeft ? lx + cardW - 3 : lx, ly, 3, cardH);
+
+    // Textos
+    const textX = lx + (placeLeft ? 8 : 10);
+    ctx.textBaseline = "top";
+    ctx.font = '600 11.5px "Space Grotesk", sans-serif';
     ctx.fillStyle = `rgba(253,230,138,${alpha})`;
-    ctx.fillText(name, bx + 8, by + 14);
-    ctx.font = subFont;
+    ctx.fillText(c.name, textX, ly + 6);
+
+    ctx.font = '500 9px "IBM Plex Mono", monospace';
     ctx.fillStyle = `rgba(156,163,175,${alpha})`;
-    ctx.fillText(sub, bx + 8, by + 26);
+    ctx.fillText(c.sub, textX, ly + 21);
+
+    if (hasExtra) {
+      ctx.font = '500 8.5px "IBM Plex Mono", monospace';
+      ctx.fillStyle = `rgba(94,234,212,${0.95 * alpha})`;
+      let line1 = "";
+      if (c.speed) line1 += `v: ${c.speed} `;
+      if (c.dilation) line1 += `| dτ: ${c.dilation}`;
+      ctx.fillText(line1, textX, ly + 36);
+
+      if (c.dist) {
+        ctx.fillStyle = `rgba(251,191,36,${0.9 * alpha})`;
+        ctx.fillText(`r: ${c.dist}`, textX, ly + 48);
+      }
+    }
   }
 }
 
